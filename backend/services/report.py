@@ -1,32 +1,55 @@
 from services.llm import ask_llm
+import json
 
-def generate_final_report(results):
+
+def generate_final_report(results, required_skills, candidate_skills, gaps, adjacent):
     prompt = f"""
-You are an expert career evaluator.
+You are an expert hiring manager.
 
-Given the following skill evaluation results:
-
+Evaluation:
 {results}
 
-Generate a final candidate report.
+Required skills:
+{required_skills}
 
-Requirements:
-- Be realistic and concise
-- Identify strengths and weaknesses clearly
-- Estimate overall job readiness
-- Combine roadmap time into total estimate
+Candidate skills:
+{candidate_skills}
 
-Return ONLY valid JSON:
+Gaps:
+{gaps}
+
+Adjacent skills:
+{adjacent}
+
+Create a final hiring report.
+
+IMPORTANT:
+- Be realistic (not overly positive)
+- Give clear reasoning
+- Provide a % fit score
+
+Return ONLY JSON:
 
 {{
-  "summary": {{
-    "strengths": ["..."],
-    "weaknesses": ["..."],
-    "overall_readiness": "Not Ready | Partially Ready | Job Ready",
-    "confidence": "Low | Medium | High"
-  }},
-  "total_time_to_ready": "X weeks",
-  "advice": "short actionable advice"
+  "fit_percentage": number,
+  "hiring_decision": "Hire | Maybe | No",
+  "summary": "clear explanation",
+  "strengths": [],
+  "gaps": [],
+  "next_steps": []
 }}
 """
-    return ask_llm(prompt)
+
+    response = ask_llm(prompt)
+
+    try:
+        return json.loads(response)
+    except:
+        return {
+            "fit_percentage": 60,
+            "hiring_decision": "Maybe",
+            "summary": "",
+            "strengths": [],
+            "gaps": [],
+            "next_steps": []
+        }

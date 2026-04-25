@@ -5,18 +5,22 @@ from services.evaluator import evaluate
 from services.skill_extractor import extract_skills
 from services.roadmap import generate_roadmap
 from services.report import generate_final_report
+from services.adjacent_skills import get_adjacent_skills
+from services.gap_analyzer import analyze_gaps
 
 router = APIRouter()
 
 
-#  START INTERVIEW
+# 🚀 START INTERVIEW
 @router.post("/start")
 def start_interview(data: dict):
     jd = data.get("jd", "")
     resume = data.get("resume", "")
 
     skills_data = extract_skills(jd, resume)
+
     required = skills_data.get("required", ["Python"])
+    candidate = skills_data.get("candidate", [])
 
     # limit to 2 skills for hackathon simplicity
     skills = required[:2]
@@ -30,8 +34,7 @@ Ask ONE clear and well-formatted beginner-level question to assess {current_skil
 Rules:
 - Only return the question
 - No explanation
-- No extra spaces or formatting issues
-- Use proper grammar
+- Clean grammar
 """
 
     question = ask_llm(prompt)
@@ -42,6 +45,7 @@ Rules:
 
     return {
         "skills": skills,
+        "candidate_skills": candidate,
         "current_skill": current_skill,
         "question": question,
         "history": history,
@@ -49,7 +53,7 @@ Rules:
     }
 
 
-#  CONTINUE INTERVIEW
+# 🚀 CONTINUE INTERVIEW
 @router.post("/answer")
 def answer_question(data: dict):
     current_skill = data["current_skill"]
@@ -57,6 +61,7 @@ def answer_question(data: dict):
     answer = data["answer"]
     skills = data["skills"]
     results = data.get("results", {})
+    candidate_skills = data.get("candidate_skills", [])
 
     # ➕ Add user answer
     history.append({
@@ -64,10 +69,10 @@ def answer_question(data: dict):
         "content": answer
     })
 
-    #  Get next step
+    # 🤖 Decide next step
     response = next_step(current_skill, history, answer)
 
-    #  If evaluation triggered
+    # 🎯 If evaluation triggered
     if "EVALUATE" in response:
         eval_result = evaluate(current_skill, history)
         roadmap = generate_roadmap(current_skill, eval_result)
@@ -78,7 +83,7 @@ def answer_question(data: dict):
             "roadmap": roadmap
         }
 
-        #  move to next skill
+        # ➡️ Move to next skill
         current_index = skills.index(current_skill)
 
         if current_index + 1 < len(skills):
@@ -87,13 +92,11 @@ def answer_question(data: dict):
             prompt = f"""
 You are a senior technical interviewer.
 
-Ask ONE clear and well-formatted beginner-level question to assess {next_skill}.
+Ask ONE clear beginner-level question to assess {next_skill}.
 
 Rules:
 - Only return the question
 - No explanation
-- No extra spaces or formatting issues
-- Use proper grammar
 """
 
             question = ask_llm(prompt)
@@ -102,21 +105,38 @@ Rules:
                 "done": False,
                 "current_skill": next_skill,
                 "skills": skills,
+                "candidate_skills": candidate_skills,
                 "question": question,
                 "history": [{"role": "ai", "content": question}],
                 "results": results
             }
 
-        #  ALL SKILLS DONE
-        final_report = generate_final_report(results)
+        # 🧠 ALL SKILLS DONE → FINAL INTELLIGENCE PIPELINE
+
+        # 🔍 GAP ANALYSIS (NEW)
+        gaps = analyze_gaps(skills, candidate_skills, results)
+
+        # 🔄 ADJACENT SKILLS
+        adjacent = get_adjacent_skills(skills, candidate_skills)
+
+        # 📊 FINAL REPORT (NOW CONTEXT-AWARE)
+        final_report = generate_final_report(
+            results,
+            skills,
+            candidate_skills,
+            gaps,
+            adjacent
+        )
 
         return {
             "done": True,
             "results": results,
+            "gaps": gaps,
+            "adjacent_skills": adjacent,
             "final_report": final_report
         }
 
-    #  Continue same skill
+    # 🔁 Continue same skill
     history.append({
         "role": "ai",
         "content": response
@@ -126,6 +146,7 @@ Rules:
         "done": False,
         "current_skill": current_skill,
         "skills": skills,
+        "candidate_skills": candidate_skills,
         "question": response,
         "history": history,
         "results": results
