@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageBubble } from './MessageBubble';
-import { Loader } from './Loader';
 import type { ChatMessage } from '@/types';
 
 interface ChatUIProps {
@@ -12,16 +11,26 @@ interface ChatUIProps {
   onSend: (answer: string) => void;
 }
 
-export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: ChatUIProps) => {
+export const ChatUI = ({
+  messages = [],
+  currentSkill = '',
+  skills = [],
+  isLoading,
+  onSend,
+}: ChatUIProps) => {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // ✅ ensure safe defaults
+  const safeMessages = Array.isArray(messages) ? messages : [];
+  const safeSkills = Array.isArray(skills) ? skills : [];
+  const safeCurrentSkill = currentSkill || '';
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [safeMessages, isLoading]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -43,17 +52,19 @@ export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: Ch
     }
   };
 
-  const completedSkills = skills.indexOf(currentSkill);
+  // ✅ SAFE indexOf
+  const completedSkills = safeSkills.indexOf(safeCurrentSkill);
 
   return (
     <div className="flex flex-col h-screen max-h-screen overflow-hidden">
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+
+      {/* HEADER */}
       <div
         className="flex-shrink-0 glass border-b px-6 py-4"
         style={{ borderColor: 'rgba(255,255,255,0.06)' }}
       >
         <div className="max-w-3xl mx-auto flex items-center justify-between">
-          {/* Logo + title */}
+
           <div className="flex items-center gap-3">
             <div
               className="w-8 h-8 rounded-xl flex items-center justify-center font-display font-bold text-xs"
@@ -64,52 +75,57 @@ export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: Ch
             >
               AI
             </div>
+
             <div>
-              <p className="font-display font-semibold text-white text-sm">Interview Session</p>
+              <p className="font-display font-semibold text-white text-sm">
+                Interview Session
+              </p>
               <p className="text-white/30 text-xs font-mono">
-                {currentSkill ? `Evaluating: ${currentSkill}` : 'Preparing…'}
+                {safeCurrentSkill
+                  ? `Evaluating: ${safeCurrentSkill}`
+                  : 'Preparing…'}
               </p>
             </div>
           </div>
 
-          {/* Progress pills */}
-          {skills.length > 0 && (
+          {/* Progress */}
+          {safeSkills.length > 0 && (
             <div className="hidden sm:flex items-center gap-1.5">
-              {skills.map((skill, i) => (
+              {safeSkills.map((skill, i) => (
                 <motion.div
                   key={skill}
                   className="h-1.5 rounded-full"
                   style={{
-                    width: skill === currentSkill ? '32px' : '12px',
+                    width: skill === safeCurrentSkill ? '32px' : '12px',
                     background:
                       i < completedSkills
                         ? 'var(--accent)'
-                        : skill === currentSkill
+                        : skill === safeCurrentSkill
                         ? 'rgba(232,255,71,0.6)'
                         : 'rgba(255,255,255,0.1)',
                   }}
-                  animate={{ width: skill === currentSkill ? '32px' : '12px' }}
+                  animate={{ width: skill === safeCurrentSkill ? '32px' : '12px' }}
                   transition={{ duration: 0.4 }}
                 />
               ))}
               <span className="text-white/25 text-[10px] font-mono ml-1">
-                {completedSkills}/{skills.length}
+                {Math.max(completedSkills, 0)}/{safeSkills.length}
               </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Messages ───────────────────────────────────────────────────── */}
+      {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto space-y-4">
           <AnimatePresence initial={false}>
-            {messages.map((msg, i) => (
+            {safeMessages.map((msg, i) => (
               <MessageBubble key={msg.id} message={msg} index={i} />
             ))}
           </AnimatePresence>
 
-          {/* Loader bubble */}
+          {/* Loader */}
           <AnimatePresence>
             {isLoading && (
               <motion.div
@@ -117,7 +133,6 @@ export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: Ch
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
               >
                 <div
                   className="flex items-center gap-3 px-5 py-4 rounded-2xl rounded-tl-sm"
@@ -137,7 +152,9 @@ export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: Ch
                       />
                     ))}
                   </div>
-                  <span className="text-white/30 text-xs font-mono">Thinking…</span>
+                  <span className="text-white/30 text-xs font-mono">
+                    Thinking…
+                  </span>
                 </div>
               </motion.div>
             )}
@@ -147,14 +164,14 @@ export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: Ch
         </div>
       </div>
 
-      {/* ── Input ──────────────────────────────────────────────────────── */}
+      {/* INPUT */}
       <div
         className="flex-shrink-0 glass border-t px-4 py-4"
         style={{ borderColor: 'rgba(255,255,255,0.06)' }}
       >
         <div className="max-w-3xl mx-auto">
           <div
-            className="flex items-end gap-3 rounded-2xl px-4 py-3 transition-all duration-200"
+            className="flex items-end gap-3 rounded-2xl px-4 py-3"
             style={{
               background: 'rgba(255,255,255,0.04)',
               border: input
@@ -167,33 +184,30 @@ export const ChatUI = ({ messages, currentSkill, skills, isLoading, onSend }: Ch
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your answer…  (Enter to send, Shift+Enter for newline)"
+              placeholder="Type your answer…"
               rows={1}
               disabled={isLoading}
-              className="flex-1 bg-transparent text-white/85 text-sm placeholder-white/20 font-body"
-              style={{ minHeight: '24px', maxHeight: '160px' }}
+              className="flex-1 bg-transparent text-white/85 text-sm placeholder-white/20"
             />
 
             <motion.button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              className="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 disabled:opacity-30"
+              className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{
-                background: input.trim() && !isLoading ? 'var(--accent)' : 'rgba(255,255,255,0.06)',
-                color: input.trim() && !isLoading ? '#080808' : 'rgba(255,255,255,0.4)',
+                background:
+                  input.trim() && !isLoading
+                    ? 'var(--accent)'
+                    : 'rgba(255,255,255,0.06)',
+                color:
+                  input.trim() && !isLoading
+                    ? '#080808'
+                    : 'rgba(255,255,255,0.4)',
               }}
-              whileHover={input.trim() && !isLoading ? { scale: 1.05 } : {}}
-              whileTap={input.trim() && !isLoading ? { scale: 0.95 } : {}}
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M7 1L13 7M13 7L7 13M13 7H1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              →
             </motion.button>
           </div>
-
-          <p className="text-center text-white/15 text-[10px] font-mono mt-2">
-            Answer thoughtfully — responses are evaluated for depth and relevance
-          </p>
         </div>
       </div>
     </div>

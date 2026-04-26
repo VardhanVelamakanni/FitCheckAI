@@ -7,7 +7,32 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble = ({ message, index }: MessageBubbleProps) => {
-  const isAI = message.role === 'ai';
+  const isAI = message?.role === 'ai';
+
+  // ✅ SAFE FALLBACKS
+  const safeContent =
+    typeof message?.content === 'string' && message.content.trim()
+      ? message.content
+      : '...';
+
+  const safeSkill =
+    typeof message?.skill === 'string' ? message.skill : null;
+
+  // ✅ SAFE TIMESTAMP
+  let safeTime = '';
+  try {
+    const date =
+      message?.timestamp instanceof Date
+        ? message.timestamp
+        : new Date(message?.timestamp || Date.now());
+
+    safeTime = date.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    safeTime = '';
+  }
 
   return (
     <motion.div
@@ -25,7 +50,8 @@ export const MessageBubble = ({ message, index }: MessageBubbleProps) => {
           <div
             className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-display font-bold"
             style={{
-              background: 'linear-gradient(135deg, rgba(232,255,71,0.2), rgba(232,255,71,0.05))',
+              background:
+                'linear-gradient(135deg, rgba(232,255,71,0.2), rgba(232,255,71,0.05))',
               border: '1px solid rgba(232,255,71,0.3)',
               color: 'var(--accent)',
             }}
@@ -36,10 +62,12 @@ export const MessageBubble = ({ message, index }: MessageBubbleProps) => {
       )}
 
       <div
-        className={`max-w-[75%] flex flex-col gap-1.5 ${isAI ? 'items-start' : 'items-end'}`}
+        className={`max-w-[75%] flex flex-col gap-1.5 ${
+          isAI ? 'items-start' : 'items-end'
+        }`}
       >
-        {/* Skill tag — AI only */}
-        {isAI && message.skill && (
+        {/* Skill tag */}
+        {isAI && safeSkill && (
           <span
             className="text-[10px] font-mono px-2 py-0.5 rounded-full tracking-wider uppercase"
             style={{
@@ -48,15 +76,14 @@ export const MessageBubble = ({ message, index }: MessageBubbleProps) => {
               color: 'rgba(232,255,71,0.7)',
             }}
           >
-            {message.skill}
+            {safeSkill}
           </span>
         )}
 
+        {/* Message */}
         <div
           className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-            isAI
-              ? 'rounded-tl-sm'
-              : 'rounded-tr-sm'
+            isAI ? 'rounded-tl-sm' : 'rounded-tr-sm'
           }`}
           style={
             isAI
@@ -72,12 +99,15 @@ export const MessageBubble = ({ message, index }: MessageBubbleProps) => {
                 }
           }
         >
-          {message.content}
+          {safeContent}
         </div>
 
-        <span className="text-[10px] text-white/25 font-mono">
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </span>
+        {/* Timestamp */}
+        {safeTime && (
+          <span className="text-[10px] text-white/25 font-mono">
+            {safeTime}
+          </span>
+        )}
       </div>
 
       {!isAI && (

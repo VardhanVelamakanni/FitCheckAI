@@ -8,15 +8,29 @@ interface ReportPageProps {
 }
 
 export const ReportPage = ({ state, onRestart }: ReportPageProps) => {
-  if (!state.results) return null;
+  const report = state.final_report;
+
+  if (!report) return null;
+
+  // 🔥 SAFE DATA NORMALIZATION
+  const safeGaps =
+    state.gaps && typeof state.gaps === 'object'
+      ? state.gaps
+      : null;
+
+  const safeAdjacentSkills = Array.isArray(state.adjacent_skills)
+    ? state.adjacent_skills
+    : [];
 
   return (
     <div className="noise bg-obsidian min-h-screen">
-      {/* Ambient background */}
+
+      {/* Background */}
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,255,71,0.04) 0%, transparent 60%)',
+          background:
+            'radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,255,71,0.04) 0%, transparent 60%)',
         }}
       />
 
@@ -33,95 +47,88 @@ export const ReportPage = ({ state, onRestart }: ReportPageProps) => {
       />
 
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-16">
+
         {/* Header */}
         <motion.div
           className="text-center mb-14"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
         >
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 mb-6">
-            <div
-              className="glass px-4 py-1.5 rounded-full flex items-center gap-2"
-            >
-              <motion.div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: '#4eff91' }}
-                animate={{ opacity: [0.5, 1, 0.5] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-              <span className="text-[10px] font-mono tracking-widest text-white/40 uppercase">
-                Interview Complete
-              </span>
-            </div>
-          </div>
-
-          <h1 className="font-display font-extrabold text-4xl md:text-5xl gradient-text mb-3">
+          <h1 className="text-4xl font-bold text-white mb-2">
             Your Report
           </h1>
-          <p className="text-white/35 text-sm font-mono">
-            Based on {state.history.filter((m) => m.role === 'user').length} answers across{' '}
-            {state.skills.length} skill areas
+
+          <p className="text-white/40 text-sm">
+            Based on {state.history.filter((m) => m.role === 'user').length} answers
           </p>
         </motion.div>
 
-        {/* Skill coverage */}
-        <motion.div
-          className="glass rounded-2xl px-6 py-4 mb-6 flex flex-wrap gap-2 items-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          <span className="text-white/30 text-xs font-mono tracking-wider mr-1">Skills evaluated:</span>
+        {/* Skills */}
+        <div className="mb-6 flex flex-wrap gap-2">
           {state.skills.map((skill) => (
             <span
               key={skill}
-              className="text-xs font-mono px-2.5 py-1 rounded-lg"
-              style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: 'rgba(255,255,255,0.5)',
-              }}
+              className="px-2 py-1 text-xs bg-white/10 rounded-md text-white/60"
             >
               {skill}
             </span>
           ))}
-        </motion.div>
+        </div>
 
-        {/* Main report */}
-        <ReportCard results={state.results} />
+        {/* REPORT */}
+        <ReportCard results={report} />
 
-        {/* Footer actions */}
-        <motion.div
-          className="flex flex-col sm:flex-row gap-4 mt-10 pt-8"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
-        >
-          <motion.button
+        {/* 🔥 GAPS + ADJACENT (SAFE) */}
+        {(safeGaps || safeAdjacentSkills.length > 0) && (
+          <div className="mt-8 p-5 rounded-xl bg-white/5 border border-white/10">
+
+            {/* GAPS */}
+            {safeGaps && (
+              <>
+                <h3 className="text-white font-semibold mb-2">
+                  Skill Gaps
+                </h3>
+                <p className="text-white/60 text-sm mb-4">
+                  {safeGaps.gap_summary || "No gap summary available"}
+                </p>
+              </>
+            )}
+
+            {/* ADJACENT SKILLS */}
+            {safeAdjacentSkills.length > 0 && (
+              <>
+                <h3 className="text-white font-semibold mb-2">
+                  Suggested Next Skills
+                </h3>
+
+                <ul className="text-white/60 text-sm space-y-1">
+                  {safeAdjacentSkills.map((s: any, i: number) => (
+                    <li key={i}>
+                      • {s?.skill || "Unknown"} — {s?.reason || ""}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ACTIONS */}
+        <div className="flex gap-4 mt-10">
+          <button
             onClick={onRestart}
-            className="flex-1 py-3.5 rounded-2xl font-display font-semibold text-sm"
-            style={{
-              background: 'var(--accent)',
-              color: '#080808',
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            className="flex-1 py-3 rounded-xl bg-lime-400 text-black font-semibold"
           >
-            Start New Interview →
-          </motion.button>
-          <motion.button
+            Start New Interview
+          </button>
+
+          <button
             onClick={() => window.print()}
-            className="flex-1 py-3.5 rounded-2xl font-display font-medium text-sm glass glass-hover"
-            style={{ color: 'rgba(255,255,255,0.6)' }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            className="flex-1 py-3 rounded-xl bg-white/10 text-white"
           >
-            Export Report
-          </motion.button>
-        </motion.div>
+            Export
+          </button>
+        </div>
       </div>
     </div>
   );

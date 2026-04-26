@@ -24,28 +24,41 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
     setError(null);
 
     try {
+      // ✅ ONLY ONE API CALL
       const res = await startInterview(data);
 
-      const backend = await startInterview(data);
+      console.log("START RESPONSE:", res); // 🔍 debug (keep for now)
+
+      // 🔥 SAFETY CHECK
+      if (!res || !res.question) {
+        throw new Error("Invalid response from server");
+      }
+
+      const safeSkill =
+        res.current_skill ||
+        res.skills?.[0] ||
+        "General";
 
       onInterviewStart({
-        sessionId: '', // backend doesn’t provide this (safe placeholder)
+        sessionId: '', // backend doesn’t provide this
         history: [
           {
             id: crypto.randomUUID(),
             role: 'ai',
-            content: backend.question,
-            skill: backend.current_skill,
+            content: res.question,
+            skill: safeSkill,
             timestamp: new Date(),
           },
         ],
-        currentSkill: backend.current_skill,
-        skills: backend.skills,
-        results: backend.results || {},
+        currentSkill: safeSkill,
+        skills: res.skills || [],
+        results: res.results || {},
         isDone: false,
       });
 
     } catch (err) {
+      console.error("START ERROR:", err);
+
       setError(
         err instanceof Error
           ? err.message

@@ -1,7 +1,7 @@
 // ─── API Request / Response Types ───────────────────────────────────────────
 
 export interface StartRequest {
-  jd: string;          
+  jd: string;
   resume: string;
 }
 
@@ -41,29 +41,34 @@ export interface AnswerResponse {
   candidate_skills?: string[];
   results?: Record<string, any>;
 
-  // 🔥 Final output fields
   final_report?: InterviewResults;
-  gaps?: {
-    missing_skills: string[];
-    weak_skills: string[];
-    gap_summary: string;
-  };
-  adjacent_skills?: {
-    skill: string;
-    reason: string;
-  }[];
+  gaps?: any;
+  adjacent_skills?: (string | { skill: string; reason?: string })[];
 }
+
 
 // ─── Domain Types ───────────────────────────────────────────────────────────
 
+export interface RoadmapItem {
+  title: string;
+  description: string;
+  timeline?: string;
+  priority: "high" | "medium" | "low";
+}
+
 export interface InterviewResults {
   fit_percentage: number;
-  hiring_decision: "Hire" | "Maybe" | "No";
-  summary: string;
+  hiring_decision: "Strong Hire" | "Hire" | "Maybe" | "No Hire";
+  summary?: string;
+
   strengths: string[];
   gaps: string[];
-  next_steps: string[];
+
+  // 🔥 important additions
+  adjacent_skills?: (string | { skill: string; reason?: string })[];
+  roadmap?: RoadmapItem[];
 }
+
 
 // ─── Chat Types ─────────────────────────────────────────────────────────────
 
@@ -77,20 +82,22 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+
 // ─── App State ──────────────────────────────────────────────────────────────
 
 export interface InterviewState {
-  sessionId: string; // optional (not used but kept for structure)
+  sessionId: string; // (kept for structure, not used)
   history: ChatMessage[];
   currentSkill: string;
   skills: string[];
-  results: any; // 🔥 flexible because backend evolves
+
+  results: Record<string, any>; // per-skill evaluations
   isDone: boolean;
 
-  // 🔥 Final stage data
+  //  Final stage outputs
   final_report?: InterviewResults;
   gaps?: any;
-  adjacent_skills?: any;
+  adjacent_skills?: (string | { skill: string; reason?: string })[];
 }
 
 export type AppPage = "landing" | "interview" | "report";

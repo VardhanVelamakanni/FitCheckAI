@@ -11,7 +11,7 @@ from services.gap_analyzer import analyze_gaps
 router = APIRouter()
 
 
-# 🚀 START INTERVIEW
+# 🟢 START INTERVIEW
 @router.post("/start")
 def start_interview(data: dict):
     jd = data.get("jd", "")
@@ -22,26 +22,27 @@ def start_interview(data: dict):
     required = skills_data.get("required", ["Python"])
     candidate = skills_data.get("candidate", [])
 
-    # limit to 2 skills for hackathon simplicity
-    skills = required[:2]
+    skills = required[:2] if required else ["Python"]
     current_skill = skills[0]
 
-    prompt = f"""
+    try:
+        question = ask_llm(f"""
 You are a senior technical interviewer.
 
-Ask ONE clear and well-formatted beginner-level question to assess {current_skill}.
+Ask ONE clear beginner-level question to assess {current_skill}.
 
 Rules:
 - Only return the question
 - No explanation
-- Clean grammar
-"""
+""")
+    except Exception as e:
+        print("LLM ERROR (start):", e)
+        question = f"Explain the basics of {current_skill}."
 
-    question = ask_llm(prompt)
+    if not question or not isinstance(question, str):
+        question = f"Explain the basics of {current_skill}."
 
-    history = [
-        {"role": "ai", "content": question}
-    ]
+    history = [{"role": "ai", "content": question}]
 
     return {
         "skills": skills,
@@ -53,53 +54,133 @@ Rules:
     }
 
 
-# 🚀 CONTINUE INTERVIEW
+# 🔵 CONTINUE INTERVIEW
 @router.post("/answer")
 def answer_question(data: dict):
-    current_skill = data["current_skill"]
-    history = data["history"]
-    answer = data["answer"]
-    skills = data["skills"]
+
+    current_skill = data.get("current_skill")
+    history = data.get("history", [])
+    answer = data.get("answer", "")
+    skills = data.get("skills", [])
     results = data.get("results", {})
     candidate_skills = data.get("candidate_skills", [])
 
-    # ➕ Add user answer
+    if not current_skill:
+        return {
+            "done": True,
+            "error": "Missing current_skill",
+            "message": "Session lost. Please restart."
+        }
+
+    # Add user answer
     history.append({
         "role": "user",
         "content": answer
     })
 
-    # 🤖 Decide next step
-    response = next_step(current_skill, history, answer)
+    # 🔥 LIMIT QUESTIONS PER SKILL
+    MAX_QUESTIONS_PER_SKILL = 3
 
-    # 🎯 If evaluation triggered
-    if "EVALUATE" in response:
-        eval_result = evaluate(current_skill, history)
-        roadmap = generate_roadmap(current_skill, eval_result)
+    question_count = len([
+        m for m in history if m["role"] == "user"
+    ])
 
-        # store result
+    # 🔥 WEAK ANSWER DETECTION
+    weak_phrases = [
+        "i don't know",
+        "idk",
+        "not sure",
+        "forgot",
+        "no idea",
+        "umm",
+        "uh",
+        "maybe"
+    ]
+
+    is_weak = (
+        len(answer.split()) <= 3 or
+        any(p in answer.lower() for p in weak_phrases)
+    )
+
+    # 🧠 DECIDE NEXT STEP
+    if question_count >= MAX_QUESTIONS_PER_SKILL:
+        response = "EVALUATE"
+
+    elif is_weak:
+        response = f"""
+It seems you're unsure.
+
+💡 Hint:
+Think about the basic concept of {current_skill}.
+
+Try answering again briefly.
+"""
+
+    else:
+        try:
+            response = next_step(current_skill, history, answer)
+        except Exception as e:
+            print("next_step ERROR:", e)
+            response = "EVALUATE"
+
+    if not response or not isinstance(response, str):
+        response = "EVALUATE"
+
+    # 🔥 PREVENT REPEATING SAME QUESTION
+    if len(history) >= 2:
+        last_ai = history[-2]["content"] if history[-2]["role"] == "ai" else ""
+        if response.strip() == last_ai.strip():
+            response = f"Let's try a different angle.\nExplain a basic concept of {current_skill}."
+
+    # 🔥 STRICT EVALUATE CHECK
+    if response.strip().startswith("EVALUATE"):
+
+        try:
+            eval_result = evaluate(current_skill, history)
+        except Exception as e:
+            print("evaluate ERROR:", e)
+            eval_result = {
+                "level": "Beginner",
+                "scores": {"conceptual": 5, "practical": 5, "clarity": 5},
+                "overall": "Moderate",
+                "strengths": [],
+                "weaknesses": ["Evaluation failed"],
+                "reason": "Fallback"
+            }
+
+        try:
+            roadmap = generate_roadmap(current_skill, eval_result)
+        except Exception as e:
+            print("roadmap ERROR:", e)
+            roadmap = []
+
         results[current_skill] = {
             "evaluation": eval_result,
             "roadmap": roadmap
         }
 
-        # ➡️ Move to next skill
-        current_index = skills.index(current_skill)
+        # 🔄 NEXT SKILL
+        try:
+            current_index = skills.index(current_skill)
+        except:
+            current_index = 0
 
         if current_index + 1 < len(skills):
             next_skill = skills[current_index + 1]
 
-            prompt = f"""
+            try:
+                question = ask_llm(f"""
 You are a senior technical interviewer.
 
-Ask ONE clear beginner-level question to assess {next_skill}.
+Ask ONE beginner-level question to assess {next_skill}.
+Only return the question.
+""")
+            except Exception as e:
+                print("LLM ERROR (next skill):", e)
+                question = f"Explain basics of {next_skill}."
 
-Rules:
-- Only return the question
-- No explanation
-"""
-
-            question = ask_llm(prompt)
+            if not question:
+                question = f"Explain basics of {next_skill}."
 
             return {
                 "done": False,
@@ -111,22 +192,34 @@ Rules:
                 "results": results
             }
 
-        # 🧠 ALL SKILLS DONE → FINAL INTELLIGENCE PIPELINE
+        # 🧠 FINAL PIPELINE
+        try:
+            gaps = analyze_gaps(skills, candidate_skills, results)
+        except Exception as e:
+            print("gap ERROR:", e)
+            gaps = []
 
-        # 🔍 GAP ANALYSIS (NEW)
-        gaps = analyze_gaps(skills, candidate_skills, results)
+        try:
+            adjacent = get_adjacent_skills(skills, candidate_skills)
+        except Exception as e:
+            print("adjacent ERROR:", e)
+            adjacent = []
 
-        # 🔄 ADJACENT SKILLS
-        adjacent = get_adjacent_skills(skills, candidate_skills)
+        # 🔥 SAFE OUTPUT
+        if not isinstance(adjacent, list):
+            adjacent = []
 
-        # 📊 FINAL REPORT (NOW CONTEXT-AWARE)
-        final_report = generate_final_report(
-            results,
-            skills,
-            candidate_skills,
-            gaps,
-            adjacent
-        )
+        try:
+            final_report = generate_final_report(
+                results,
+                skills,
+                candidate_skills,
+                gaps,
+                adjacent
+            )
+        except Exception as e:
+            print("report ERROR:", e)
+            final_report = {}
 
         return {
             "done": True,
@@ -136,7 +229,7 @@ Rules:
             "final_report": final_report
         }
 
-    # 🔁 Continue same skill
+    # 🔁 CONTINUE SAME SKILL
     history.append({
         "role": "ai",
         "content": response

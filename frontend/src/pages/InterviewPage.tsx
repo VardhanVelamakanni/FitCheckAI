@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatUI } from '@/components/ChatUI';
-import { Loader } from '@/components/Loader';
-import { sendAnswer } from '@/services/api'; // ✅ fixed import
+import { sendAnswer } from '@/services/api';
 import type { ChatMessage, InterviewState } from '@/types';
 
 interface InterviewPageProps {
@@ -16,6 +15,16 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
   const [error, setError] = useState<string | null>(null);
 
   const handleSend = async (answer: string) => {
+    if (!answer.trim()) return;
+
+    console.log("🧠 STATE:", state);
+
+    // 🔥 ALWAYS SAFE SKILL (NEVER BREAK)
+    const safeSkill =
+      state.currentSkill ||
+      state.skills?.[0] ||
+      "General";
+
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -23,31 +32,37 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
       timestamp: new Date(),
     };
 
-    const updatedHistory = [...state.history, userMessage];
+    const updatedHistory = [...(state.history || []), userMessage];
 
-    // update UI immediately
     onUpdate({ history: updatedHistory });
 
     setIsThinking(true);
     setError(null);
 
     try {
-      // 🔥 SEND CORRECT DATA TO BACKEND
-      const res = await sendAnswer({
-        current_skill: state.currentSkill,
+      const payload = {
+        current_skill: safeSkill,
         history: updatedHistory.map((msg) => ({
           role: msg.role,
           content: msg.content,
         })),
         answer,
-        skills: state.skills,
+        skills: state.skills || [],
         candidate_skills: [],
         results: state.results || {},
-      });
+      };
 
-      // 🧠 IF INTERVIEW COMPLETED
+      console.log("📤 PAYLOAD:", payload);
+
+      const res = await sendAnswer(payload);
+
+      console.log("📥 RESPONSE:", res);
+
+      if (!res) throw new Error("No backend response");
+
+      // ✅ FINAL
       if (res.done) {
-        const finalState: InterviewState = {
+        onComplete({
           ...state,
           history: updatedHistory,
           results: res.results || {},
@@ -55,31 +70,40 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
           final_report: res.final_report,
           gaps: res.gaps,
           adjacent_skills: res.adjacent_skills,
-        };
-
-        onComplete(finalState);
-      } else {
-        // 🧠 CONTINUE INTERVIEW
-        const aiMessage: ChatMessage = {
-          id: crypto.randomUUID(),
-          role: 'ai',
-          content: res.question || '',
-          skill: res.current_skill,
-          timestamp: new Date(),
-        };
-
-        onUpdate({
-          history: [...updatedHistory, aiMessage],
-          currentSkill: res.current_skill || state.currentSkill,
-          results: res.results || state.results,
+          currentSkill: safeSkill, // 🔥 preserve
         });
+        return;
       }
 
+      // 🔥 SAFE RESPONSE HANDLING
+      const nextSkill =
+        res.current_skill ||
+        safeSkill;
+
+      const aiMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'ai',
+        content:
+          res.question && res.question !== "EVALUATE"
+            ? res.question
+            : "Let's continue…",
+        skill: nextSkill,
+        timestamp: new Date(),
+      };
+
+      onUpdate({
+        history: [...updatedHistory, aiMessage],
+        currentSkill: nextSkill,
+        results: res.results ?? state.results,
+      });
+
     } catch (err) {
+      console.error("❌ ERROR:", err);
+
       setError(
         err instanceof Error
           ? err.message
-          : 'Something went wrong. Please retry.'
+          : "Something went wrong"
       );
     } finally {
       setIsThinking(false);
@@ -88,8 +112,8 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
 
   return (
     <div className="bg-obsidian h-screen overflow-hidden relative">
-      
-      {/* Background ambient */}
+
+      {/* Background */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -105,39 +129,26 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
         transition={{ duration: 0.4 }}
       >
         <ChatUI
-          messages={state.history}
-          currentSkill={state.currentSkill}
-          skills={state.skills}
+          messages={state.history || []}
+          currentSkill={state.currentSkill || state.skills?.[0] || "General"}
+          skills={state.skills || []}
           isLoading={isThinking}
           onSend={handleSend}
         />
       </motion.div>
 
-      {/* Error toast */}
+      {/* ERROR */}
       <AnimatePresence>
         {error && (
           <motion.div
             className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50"
-            initial={{ opacity: 0, y: 16, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >
-            <div
-              className="px-5 py-3 rounded-xl text-sm font-body flex items-center gap-3"
-              style={{
-                background: 'rgba(255,80,80,0.12)',
-                border: '1px solid rgba(255,80,80,0.3)',
-                color: '#ff8080',
-              }}
-            >
-              <span>⚠</span>
-              {error}
-              <button
-                onClick={() => setError(null)}
-                className="ml-2 opacity-60 hover:opacity-100 text-xs"
-              >
-                ✕
-              </button>
+            <div className="px-5 py-3 rounded-xl text-sm flex gap-3 bg-red-500/10 border border-red-400/30 text-red-300">
+              ⚠ {error}
+              <button onClick={() => setError(null)}>✕</button>
             </div>
           </motion.div>
         )}

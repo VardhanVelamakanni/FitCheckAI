@@ -1,49 +1,59 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 
 interface LoaderProps {
   text?: string;
 }
 
-export const Loader = ({ text = 'AI is evaluating…' }: LoaderProps) => {
+export const Loader = ({ text }: LoaderProps) => {
+  //  Respect user motion preferences
+  const shouldReduceMotion = useReducedMotion();
+
+  //  Safe fallback text
+  const safeText =
+    typeof text === 'string' && text.trim()
+      ? text
+      : 'AI is evaluating…';
+
   return (
     <motion.div
       className="flex flex-col items-center justify-center gap-8"
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
+      transition={{ duration: 0.4 }}
     >
-      {/* Orbital rings */}
+      {/* Orbital Loader */}
       <div className="relative w-20 h-20 flex items-center justify-center">
+
         {/* Outer ring */}
         <motion.div
           className="absolute inset-0 rounded-full"
-          style={{
-            border: '1px solid rgba(232,255,71,0.2)',
-          }}
-          animate={{ rotate: 360 }}
+          style={{ border: '1px solid rgba(232,255,71,0.2)' }}
+          animate={!shouldReduceMotion ? { rotate: 360 } : {}}
           transition={{ duration: 6, repeat: Infinity, ease: 'linear' }}
         />
+
         {/* Middle ring */}
         <motion.div
           className="absolute inset-3 rounded-full"
-          style={{
-            border: '1px solid rgba(232,255,71,0.35)',
-          }}
-          animate={{ rotate: -360 }}
+          style={{ border: '1px solid rgba(232,255,71,0.35)' }}
+          animate={!shouldReduceMotion ? { rotate: -360 } : {}}
           transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
         />
-        {/* Inner dot */}
+
+        {/* Inner pulse */}
         <motion.div
           className="w-2.5 h-2.5 rounded-full"
           style={{ background: 'var(--accent)' }}
-          animate={{
-            scale: [1, 1.4, 1],
-            opacity: [0.8, 1, 0.8],
-          }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          animate={
+            !shouldReduceMotion
+              ? { scale: [1, 1.4, 1], opacity: [0.8, 1, 0.8] }
+              : {}
+          }
+          transition={{ duration: 2, repeat: Infinity }}
         />
-        {/* Orbiting dot */}
+
+        {/* Orbit dot */}
         <motion.div
           className="absolute w-1.5 h-1.5 rounded-full"
           style={{
@@ -53,7 +63,7 @@ export const Loader = ({ text = 'AI is evaluating…' }: LoaderProps) => {
             marginLeft: '-3px',
             transformOrigin: '3px 34px',
           }}
-          animate={{ rotate: 360 }}
+          animate={!shouldReduceMotion ? { rotate: 360 } : {}}
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
         />
       </div>
@@ -62,11 +72,12 @@ export const Loader = ({ text = 'AI is evaluating…' }: LoaderProps) => {
       <div className="text-center space-y-2">
         <motion.p
           className="font-display font-medium text-white/80 text-sm tracking-widest uppercase"
-          animate={{ opacity: [0.5, 1, 0.5] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+          animate={!shouldReduceMotion ? { opacity: [0.5, 1, 0.5] } : {}}
+          transition={{ duration: 2.5, repeat: Infinity }}
         >
-          {text}
+          {safeText}
         </motion.p>
+
         {/* Dot progress */}
         <div className="flex gap-1.5 justify-center">
           {[0, 1, 2].map((i) => (
@@ -74,12 +85,11 @@ export const Loader = ({ text = 'AI is evaluating…' }: LoaderProps) => {
               key={i}
               className="w-1 h-1 rounded-full"
               style={{ background: 'var(--accent)' }}
-              animate={{ opacity: [0.2, 1, 0.2] }}
+              animate={!shouldReduceMotion ? { opacity: [0.2, 1, 0.2] } : {}}
               transition={{
                 duration: 1.5,
                 repeat: Infinity,
                 delay: i * 0.3,
-                ease: 'easeInOut',
               }}
             />
           ))}
