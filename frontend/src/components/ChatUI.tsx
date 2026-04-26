@@ -22,7 +22,6 @@ export const ChatUI = ({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // ✅ ensure safe defaults
   const safeMessages = Array.isArray(messages) ? messages : [];
   const safeSkills = Array.isArray(skills) ? skills : [];
   const safeCurrentSkill = currentSkill || '';
@@ -52,8 +51,11 @@ export const ChatUI = ({
     }
   };
 
-  // ✅ SAFE indexOf
-  const completedSkills = safeSkills.indexOf(safeCurrentSkill);
+  // ✅ SAFE INDEX
+  const completedSkills = Math.max(safeSkills.indexOf(safeCurrentSkill), 0);
+
+  // ✅ REMOVE "General" FROM VISUAL PROGRESS
+  const displaySkills = safeSkills.filter(s => s !== "General");
 
   return (
     <div className="flex flex-col h-screen max-h-screen overflow-hidden">
@@ -88,10 +90,11 @@ export const ChatUI = ({
             </div>
           </div>
 
-          {/* Progress */}
-          {safeSkills.length > 0 && (
+          {/* 🔥 FIXED PROGRESS */}
+          {displaySkills.length > 0 && (
             <div className="hidden sm:flex items-center gap-1.5">
-              {safeSkills.map((skill, i) => (
+
+              {displaySkills.map((skill, i) => (
                 <motion.div
                   key={skill}
                   className="h-1.5 rounded-full"
@@ -108,9 +111,12 @@ export const ChatUI = ({
                   transition={{ duration: 0.4 }}
                 />
               ))}
+
+              {/* ✅ CLEAN LABEL (NO FRACTION BUG) */}
               <span className="text-white/25 text-[10px] font-mono ml-1">
-                {Math.max(completedSkills, 0)}/{safeSkills.length}
+                Skill {completedSkills + 1} of {displaySkills.length}
               </span>
+
             </div>
           )}
         </div>

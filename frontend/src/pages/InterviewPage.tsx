@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatUI } from '@/components/ChatUI';
 import { sendAnswer } from '@/services/api';
-import type { ChatMessage, InterviewState } from '@/types';
+import type { ChatMessage, InterviewState, UpdateInterviewState } from '@/types';
 
 interface InterviewPageProps {
   state: InterviewState;
-  onUpdate: (updates: Partial<InterviewState>) => void;
+  onUpdate: (updates: UpdateInterviewState) => void;  
   onComplete: (state: InterviewState) => void;
 }
 
@@ -17,85 +17,89 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
   const handleSend = async (answer: string) => {
     if (!answer.trim()) return;
 
-    console.log("🧠 STATE:", state);
+    // 🚨 CRITICAL: ensure session exists
+    if (!state.sessionId) {
+      console.error("❌ No sessionId found");
+      setError("Session not initialized. Please restart interview.");
+      return;
+    }
 
-    // 🔥 ALWAYS SAFE SKILL (NEVER BREAK)
-    const safeSkill =
-      state.currentSkill ||
-      state.skills?.[0] ||
-      "General";
+    console.log("🧠 USING SESSION:", state.sessionId);
+
+    const currentSkill = state.currentSkill || state.skills?.[0];
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: answer,
       timestamp: new Date(),
+      skill: currentSkill,
     };
 
     const updatedHistory = [...(state.history || []), userMessage];
 
-    onUpdate({ history: updatedHistory });
+    // 🔥 Use functional update to avoid stale state
+    onUpdate((prev: InterviewState) => ({
+      ...prev,
+      history: updatedHistory,
+    }));
 
     setIsThinking(true);
     setError(null);
 
     try {
       const payload = {
-        current_skill: safeSkill,
-        history: updatedHistory.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
+        session_id: state.sessionId,  // 🔥 REQUIRED
         answer,
-        skills: state.skills || [],
-        candidate_skills: [],
-        results: state.results || {},
       };
 
-      console.log("📤 PAYLOAD:", payload);
+      console.log("📤 SEND:", payload);
 
       const res = await sendAnswer(payload);
 
-      console.log("📥 RESPONSE:", res);
+      console.log("📥 RECV:", res);
 
-      if (!res) throw new Error("No backend response");
+      if (!res) {
+        throw new Error("No backend response");
+      }
 
-      // ✅ FINAL
+      // 🚨 If backend ends early → debug
       if (res.done) {
+        console.warn("⚠️ Backend ended early → likely session issue");
+
         onComplete({
           ...state,
           history: updatedHistory,
           results: res.results || {},
           isDone: true,
           final_report: res.final_report,
-          gaps: res.gaps,
-          adjacent_skills: res.adjacent_skills,
-          currentSkill: safeSkill, // 🔥 preserve
         });
+
         return;
       }
 
-      // 🔥 SAFE RESPONSE HANDLING
-      const nextSkill =
-        res.current_skill ||
-        safeSkill;
+      if (!res.current_skill) {
+        throw new Error("Backend missing current_skill");
+      }
 
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content:
-          res.question && res.question !== "EVALUATE"
-            ? res.question
-            : "Let's continue…",
-        skill: nextSkill,
+        content: res.question || "Let's continue…",
+        skill: res.current_skill,
         timestamp: new Date(),
       };
 
-      onUpdate({
+      console.log("📊 NEXT SKILL:", res.current_skill);
+
+      // 🔥 SAFE STATE UPDATE
+      onUpdate((prev: InterviewState) => ({
+        ...prev,
         history: [...updatedHistory, aiMessage],
-        currentSkill: nextSkill,
-        results: res.results ?? state.results,
-      });
+        currentSkill: res.current_skill,
+        results: res.results ?? prev.results,
+        skills: res.skills ?? prev.skills,
+      }));
 
     } catch (err) {
       console.error("❌ ERROR:", err);
@@ -130,7 +134,7 @@ export const InterviewPage = ({ state, onUpdate, onComplete }: InterviewPageProp
       >
         <ChatUI
           messages={state.history || []}
-          currentSkill={state.currentSkill || state.skills?.[0] || "General"}
+          currentSkill={state.currentSkill || state.skills?.[0]}
           skills={state.skills || []}
           isLoading={isThinking}
           onSend={handleSend}

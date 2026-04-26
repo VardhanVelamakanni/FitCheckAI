@@ -2,6 +2,17 @@ from services.llm import ask_llm
 import json
 
 
+# 🔧 SAFE PARSE (LLM can return strings)
+def safe_int(val, default=5):
+    try:
+        return int(val)
+    except:
+        try:
+            return int(float(val))
+        except:
+            return default
+
+
 def evaluate(skill, history):
     prompt = f"""
 You are a strict senior technical interviewer.
@@ -11,25 +22,26 @@ Evaluate the candidate for the skill: {skill}
 Conversation:
 {history}
 
-IMPORTANT:
-- Do NOT give perfect scores unless truly exceptional
-- Basic correct answers = 5–7 range
-- Reserve 9–10 for advanced, real-world depth
-- Be realistic and critical
+Rules:
+- Be realistic
+- Basic answers → 5–6
+- Moderate → 6–7
+- Strong → 7–9
+- Exceptional → 9–10
+- Avoid giving very high scores unless clearly deserved
 
-Return ONLY valid JSON (no markdown, no explanation):
+Return ONLY valid JSON:
 
 {{
   "level": "Beginner | Intermediate | Advanced",
   "scores": {{
-    "conceptual": number (1-10),
-    "practical": number (1-10),
-    "clarity": number (1-10)
+    "conceptual": number,
+    "practical": number,
+    "clarity": number
   }},
-  "overall": "Strong | Moderate | Weak",
-  "strengths": ["point1", "point2"],
-  "weaknesses": ["point1", "point2"],
-  "reason": "brief explanation"
+  "strengths": [],
+  "weaknesses": [],
+  "reason": ""
 }}
 """
 
@@ -37,13 +49,50 @@ Return ONLY valid JSON (no markdown, no explanation):
 
     try:
         data = json.loads(response)
-        return data
+
+        scores = data.get("scores", {})
+
+        conceptual = safe_int(scores.get("conceptual", 5))
+        practical = safe_int(scores.get("practical", 5))
+        clarity = safe_int(scores.get("clarity", 5))
+
+        # =============================
+        # 🔥 SCORE CALCULATION
+        # =============================
+        avg_score = (conceptual + practical + clarity) / 3
+        percentage = round(avg_score * 10)
+
+        # =============================
+        # 🎯 FINAL TAG LOGIC (ALIGNED WITH REPORT)
+        # =============================
+        if percentage >= 65:
+            level_tag = "good"
+        elif percentage >= 50:
+            level_tag = "okayish"
+        else:
+            level_tag = "bad"
+
+        return {
+            "level": data.get("level", "Intermediate"),
+            "scores": {
+                "conceptual": conceptual,
+                "practical": practical,
+                "clarity": clarity
+            },
+            "percentage": percentage,
+            "tag": level_tag,
+            "strengths": data.get("strengths", []),
+            "weaknesses": data.get("weaknesses", []),
+            "reason": data.get("reason", "")
+        }
 
     except Exception as e:
-        print(" Evaluation parsing failed:", e)
+        print("❌ Evaluation parsing failed:", e)
         print("Raw response:", response)
 
-        # fallback (VERY IMPORTANT for demo stability)
+        # =============================
+        # 🔥 STABLE FALLBACK
+        # =============================
         return {
             "level": "Beginner",
             "scores": {
@@ -51,8 +100,9 @@ Return ONLY valid JSON (no markdown, no explanation):
                 "practical": 5,
                 "clarity": 5
             },
-            "overall": "Moderate",
+            "percentage": 50,
+            "tag": "okayish",
             "strengths": [],
-            "weaknesses": ["Could not properly evaluate"],
+            "weaknesses": ["Evaluation failed"],
             "reason": "Fallback evaluation"
         }

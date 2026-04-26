@@ -3,40 +3,70 @@ import json
 
 
 def analyze_gaps(required_skills, candidate_skills, results):
-    prompt = f"""
+
+    # 🔥 CLEAN INPUTS
+    required_skills = [s.strip() for s in required_skills if isinstance(s, str)]
+    candidate_skills = [s.strip() for s in candidate_skills if isinstance(s, str)]
+
+    # =============================
+    # 🧠 CORE GAP LOGIC (NO LLM)
+    # =============================
+
+    missing_skills = [
+        skill for skill in required_skills
+        if skill not in candidate_skills
+    ]
+
+    weak_skills = [
+        skill for skill, data in results.items()
+        if data.get("level") in ["bad", "okayish"]
+    ]
+
+    strong_skills = [
+        skill for skill, data in results.items()
+        if data.get("level") == "good"
+    ]
+
+    print("📊 GAP DEBUG:")
+    print("Missing:", missing_skills)
+    print("Weak:", weak_skills)
+    print("Strong:", strong_skills)
+
+    # =============================
+    # 🧠 GENERATE SUMMARY (LLM ONLY FOR TEXT)
+    # =============================
+    try:
+        summary = ask_llm(f"""
 You are a hiring manager.
 
-Job requires:
+Required skills:
 {required_skills}
 
-Candidate has:
+Candidate skills:
 {candidate_skills}
 
-Evaluation results:
-{results}
+Strong skills:
+{strong_skills}
 
-Identify:
+Weak skills:
+{weak_skills}
 
-1. Missing skills
-2. Weak skills
-3. Why candidate is not fully ready
+Missing skills:
+{missing_skills}
 
-Return ONLY JSON:
+Write a concise hiring gap summary.
 
-{{
-  "missing_skills": [],
-  "weak_skills": [],
-  "gap_summary": "clear explanation"
-}}
-"""
-
-    response = ask_llm(prompt)
-
-    try:
-        return json.loads(response)
+Rules:
+- Be realistic
+- Mention strengths briefly
+- Focus on gaps
+- 2–3 lines max
+""")
     except:
-        return {
-            "missing_skills": [],
-            "weak_skills": [],
-            "gap_summary": ""
-        }
+        summary = ""
+
+    return {
+        "missing_skills": missing_skills,
+        "weak_skills": weak_skills,
+        "gap_summary": summary or "Candidate needs improvement in key required areas."
+    }

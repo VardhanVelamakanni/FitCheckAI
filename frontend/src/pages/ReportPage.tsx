@@ -12,16 +12,6 @@ export const ReportPage = ({ state, onRestart }: ReportPageProps) => {
 
   if (!report) return null;
 
-  // 🔥 SAFE DATA NORMALIZATION
-  const safeGaps =
-    state.gaps && typeof state.gaps === 'object'
-      ? state.gaps
-      : null;
-
-  const safeAdjacentSkills = Array.isArray(state.adjacent_skills)
-    ? state.adjacent_skills
-    : [];
-
   return (
     <div className="noise bg-obsidian min-h-screen">
 
@@ -50,7 +40,7 @@ export const ReportPage = ({ state, onRestart }: ReportPageProps) => {
 
         {/* Header */}
         <motion.div
-          className="text-center mb-14"
+          className="text-center mb-10"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -64,7 +54,7 @@ export const ReportPage = ({ state, onRestart }: ReportPageProps) => {
         </motion.div>
 
         {/* Skills */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-6 flex flex-wrap gap-2 justify-center">
           {state.skills.map((skill) => (
             <span
               key={skill}
@@ -75,56 +65,28 @@ export const ReportPage = ({ state, onRestart }: ReportPageProps) => {
           ))}
         </div>
 
-        {/* REPORT */}
+        {/* ✨ INTRO (nice polish) */}
+        <div className="mb-6 text-center">
+          <p className="text-white/50 text-sm">
+            Here’s your performance breakdown and a personalized plan to improve 🚀
+          </p>
+        </div>
+
+        {/* 🔥 MAIN REPORT */}
         <ReportCard results={report} />
-
-        {/* 🔥 GAPS + ADJACENT (SAFE) */}
-        {(safeGaps || safeAdjacentSkills.length > 0) && (
-          <div className="mt-8 p-5 rounded-xl bg-white/5 border border-white/10">
-
-            {/* GAPS */}
-            {safeGaps && (
-              <>
-                <h3 className="text-white font-semibold mb-2">
-                  Skill Gaps
-                </h3>
-                <p className="text-white/60 text-sm mb-4">
-                  {safeGaps.gap_summary || "No gap summary available"}
-                </p>
-              </>
-            )}
-
-            {/* ADJACENT SKILLS */}
-            {safeAdjacentSkills.length > 0 && (
-              <>
-                <h3 className="text-white font-semibold mb-2">
-                  Suggested Next Skills
-                </h3>
-
-                <ul className="text-white/60 text-sm space-y-1">
-                  {safeAdjacentSkills.map((s: any, i: number) => (
-                    <li key={i}>
-                      • {s?.skill || "Unknown"} — {s?.reason || ""}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
-        )}
 
         {/* ACTIONS */}
         <div className="flex gap-4 mt-10">
           <button
             onClick={onRestart}
-            className="flex-1 py-3 rounded-xl bg-lime-400 text-black font-semibold"
+            className="flex-1 py-3 rounded-xl bg-lime-400 text-black font-semibold hover:opacity-90"
           >
             Start New Interview
           </button>
 
           <button
             onClick={() => window.print()}
-            className="flex-1 py-3 rounded-xl bg-white/10 text-white"
+            className="flex-1 py-3 rounded-xl bg-white/10 text-white hover:bg-white/20"
           >
             Export
           </button>

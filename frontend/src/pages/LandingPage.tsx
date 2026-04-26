@@ -24,13 +24,12 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
     setError(null);
 
     try {
-      // ✅ ONLY ONE API CALL
       const res = await startInterview(data);
 
-      console.log("START RESPONSE:", res); // 🔍 debug (keep for now)
+      console.log("🚀 START RESPONSE:", res);
 
-      // 🔥 SAFETY CHECK
-      if (!res || !res.question) {
+      // 🔥 VALIDATION
+      if (!res || !res.question || !res.session_id) {
         throw new Error("Invalid response from server");
       }
 
@@ -39,8 +38,11 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
         res.skills?.[0] ||
         "General";
 
+      console.log("✅ SESSION STORED:", res.session_id);
+
+      // 🔥 FIXED STATE (THIS WAS YOUR BUG)
       onInterviewStart({
-        sessionId: '', // backend doesn’t provide this
+        sessionId: res.session_id,   // ✅ CRITICAL FIX
         history: [
           {
             id: crypto.randomUUID(),
@@ -52,12 +54,13 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
         ],
         currentSkill: safeSkill,
         skills: res.skills || [],
+        candidate_skills: res.candidate_skills || [],
         results: res.results || {},
         isDone: false,
       });
 
     } catch (err) {
-      console.error("START ERROR:", err);
+      console.error("❌ START ERROR:", err);
 
       setError(
         err instanceof Error
@@ -73,11 +76,14 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
     <div className="noise bg-obsidian min-h-screen">
       <HeroSection onCTAClick={scrollToInput} />
 
-      <div ref={inputRef as React.RefObject<HTMLDivElement>}>
+      <div
+        id="input-section"
+        ref={inputRef as React.RefObject<HTMLDivElement>}
+      >
         <InputSection onSubmit={handleSubmit} isLoading={isLoading} />
       </div>
 
-      {/* Error toast */}
+      {/* ERROR TOAST */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -87,7 +93,7 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
           >
             <div
-              className="px-5 py-3 rounded-xl text-sm font-body flex items-center gap-3"
+              className="px-5 py-3 rounded-xl text-sm flex items-center gap-3"
               style={{
                 background: 'rgba(255,80,80,0.12)',
                 border: '1px solid rgba(255,80,80,0.3)',
@@ -107,7 +113,7 @@ export const LandingPage = ({ onInterviewStart }: LandingPageProps) => {
         )}
       </AnimatePresence>
 
-      {/* Loading overlay */}
+      {/* LOADING */}
       <AnimatePresence>
         {isLoading && (
           <motion.div

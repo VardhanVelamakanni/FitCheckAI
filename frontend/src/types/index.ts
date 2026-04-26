@@ -6,67 +6,79 @@ export interface StartRequest {
 }
 
 export interface StartResponse {
+  session_id: string; // 🔥 REQUIRED
+
   skills: string[];
   candidate_skills: string[];
+
   current_skill: string;
   question: string;
-  history: {
-    role: "ai" | "user";
-    content: string;
-  }[];
+
   results: Record<string, any>;
 }
 
+
+// 🔥 SESSION-BASED REQUEST
 export interface AnswerRequest {
-  current_skill: string;
-  history: {
-    role: "ai" | "user";
-    content: string;
-  }[];
+  session_id: string;
   answer: string;
-  skills: string[];
-  candidate_skills: string[];
-  results: Record<string, any>;
 }
 
+
+// 🔥 RESPONSE FROM BACKEND
 export interface AnswerResponse {
   done: boolean;
+
+  session_id?: string;
+
   current_skill?: string;
   question?: string;
-  history?: {
-    role: "ai" | "user";
-    content: string;
-  }[];
+
   skills?: string[];
-  candidate_skills?: string[];
   results?: Record<string, any>;
 
   final_report?: InterviewResults;
-  gaps?: any;
-  adjacent_skills?: (string | { skill: string; reason?: string })[];
 }
 
 
 // ─── Domain Types ───────────────────────────────────────────────────────────
 
-export interface RoadmapItem {
-  title: string;
-  description: string;
-  timeline?: string;
-  priority: "high" | "medium" | "low";
+export interface RoadmapStep {
+  topic: string;
+  why?: string;
+  resources?: string[];
+  practice?: string;
+  time_estimate?: string;
 }
 
+export interface Roadmap {
+  focus_areas?: string[];
+  plan: RoadmapStep[];
+  total_time?: string;
+  difficulty?: "Easy" | "Medium" | "Hard";
+}
+
+
+// 🔥 FINAL REPORT STRUCTURE
 export interface InterviewResults {
   fit_percentage: number;
-  hiring_decision: "Strong Hire" | "Hire" | "Maybe" | "No Hire";
+  hiring_decision: "Hire" | "Maybe" | "No";
+
   summary?: string;
 
   strengths: string[];
   gaps: string[];
 
-  // 🔥 important additions
   adjacent_skills?: (string | { skill: string; reason?: string })[];
-  roadmap?: RoadmapItem[];
+
+  learning_plan?: {
+    skill: string;
+    topics: string[];
+    resources: string[];
+    time_estimate: string;
+  }[];
+
+  roadmap?: Roadmap;
 }
 
 
@@ -78,7 +90,9 @@ export interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
+
   skill?: string;
+
   timestamp: Date;
 }
 
@@ -86,18 +100,31 @@ export interface ChatMessage {
 // ─── App State ──────────────────────────────────────────────────────────────
 
 export interface InterviewState {
-  sessionId: string; // (kept for structure, not used)
+  sessionId?: string;
+
   history: ChatMessage[];
-  currentSkill: string;
+
+  currentSkill?: string;   // 🔥 FIX: was strict → now safe
   skills: string[];
 
-  results: Record<string, any>; // per-skill evaluations
+  candidate_skills?: string[];
+
+  results: Record<string, any>;
+
   isDone: boolean;
 
-  //  Final stage outputs
   final_report?: InterviewResults;
-  gaps?: any;
-  adjacent_skills?: (string | { skill: string; reason?: string })[];
 }
+
+
+// ─── 🔥 FIXED UPDATE TYPE (CRITICAL) ─────────────────────────────────────────
+
+// THIS fixes your "no properties in common" error
+export type UpdateInterviewState =
+  | Partial<InterviewState>
+  | ((prev: InterviewState) => InterviewState);
+
+
+// ─── App Routing ────────────────────────────────────────────────────────────
 
 export type AppPage = "landing" | "interview" | "report";
