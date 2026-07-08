@@ -113,7 +113,7 @@ uvicorn main:app --reload
 
 ---
 
-## Author
+
 
 **Hemavardhan Velamakanni**
 
